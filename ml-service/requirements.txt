@@ -1,0 +1,29 @@
+# FastAPI Web Framework
+fastapi==0.115.14
+uvicorn==0.34.3
+
+# Machine Learning & Data Processing
+# sentence-transformers 3.x+ works with huggingface_hub 1.x and torch 2.x
+sentence-transformers==3.4.1
+torch==2.2.2
+scikit-learn==1.6.1
+scipy==1.15.3
+numpy==1.26.4
+pandas==2.2.3
+
+# Model Serialization
+joblib==1.4.2
+
+# API & Data Validation
+pydantic==2.10.6
+httpx==0.28.1
+
+# Testing
+pytest==8.3.5
+pytest-asyncio==0.25.3
+
+# External Data
+kagglehub==0.3.12
+
+# Additional utilities
+python-dotenv==1.1.0
