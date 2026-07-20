@@ -12,7 +12,7 @@ from .schemas import (
     RetrainRequest,
 )
 from .recommender_v2 import get_recommendations, initialize_models
-from .feedback import log_feedback, get_accuracy
+from .feedback import log_feedback, get_accuracy, load_from_disk
 from .collab_filter import train_cf, get_cf_stats
 from .nlp_matcher import get_model
 from .retrain import rebuild_from_payload, rebuild_from_accumulated
@@ -32,19 +32,19 @@ async def lifespan(app: FastAPI):
     try:
         logger.info("Starting ML Service with Enhanced Models...")
         logger.info("=" * 70)
-        
+
         # Get model directory from environment
         model_dir = os.getenv("MODEL_DIR", "./models")
-        
+
         # Step 1: Load sentence-transformers base model
         logger.info("Step 1: Loading base NLP model...")
         get_model()
         logger.info("Base NLP model ready")
-        
+
         # Step 2: Load trained models
         logger.info("Step 2: Loading trained models...")
         trained_loaded = initialize_models(model_dir=model_dir)
-        
+
         if trained_loaded:
             logger.info("Trained models loaded from disk")
             models_trained = True
@@ -52,7 +52,7 @@ async def lifespan(app: FastAPI):
             logger.warning("Trained models not found")
             logger.info("   To train models, run: python train.py")
             logger.info("   Models will use fallback/seed-based recommendations")
-        
+
         model_loaded = True
         logger.info("=" * 70)
         # Step 3: Restore feedback log from disk so the CF matrix survives restarts
@@ -62,16 +62,17 @@ async def lifespan(app: FastAPI):
         else:
             logger.info("No saved feedback yet")
         logger.info("ML Service ready for requests")
-        
+
     except Exception as e:
         logger.error(f"Startup error: {e}")
         import traceback
+
         traceback.print_exc()
         model_loaded = False
         models_trained = False
-    
+
     yield
-    
+
     # Shutdown
     logger.info("ML Service shutting down")
 
@@ -86,7 +87,11 @@ app = FastAPI(
 # CORS — restrict to known origins via ALLOWED_ORIGINS env (comma-separated).
 # Defaults to local dev origins; set ALLOWED_ORIGINS in production.
 _default_origins = "http://localhost:5000,http://127.0.0.1:5000,http://localhost:5173,http://127.0.0.1:5173"
-allowed_origins = [o.strip() for o in os.getenv("ALLOWED_ORIGINS", _default_origins).split(",") if o.strip()]
+allowed_origins = [
+    o.strip()
+    for o in os.getenv("ALLOWED_ORIGINS", _default_origins).split(",")
+    if o.strip()
+]
 app.add_middleware(
     CORSMiddleware,
     allow_origins=allowed_origins,
@@ -116,7 +121,6 @@ async def status():
             "Enhanced NLP with task embeddings",
             "Collaborative Filtering (k-NN)",
             "TAWOS-compatible training",
-            "Stack Overflow integration",
             "Model persistence",
         ],
     }
@@ -126,7 +130,7 @@ async def status():
 async def recommend(request: RecommendRequest):
     """
     Get task recommendations for developers.
-    
+
     Uses trained models if available, falls back to heuristics otherwise.
     """
     try:
@@ -134,9 +138,9 @@ async def recommend(request: RecommendRequest):
 
         result = get_recommendations(
             task={
-                'id': request.task.id,
-                'description': request.task.description,
-                'title': getattr(request.task, 'title', request.task.id),
+                "id": request.task.id,
+                "description": request.task.description,
+                "title": getattr(request.task, "title", request.task.id),
             },
             developers=[d.model_dump() for d in request.developers],
             assignments=[a.model_dump() for a in request.assignments],
@@ -147,21 +151,21 @@ async def recommend(request: RecommendRequest):
         # Convert to schema
         recommendations = [
             RecommendationItem(
-                developerId=r['developerId'],
-                name=r['name'],
-                score=r['score'],
-                breakdown=ScoreBreakdown(**r['breakdown']),
-                skillTags=r.get('skillTags', []),
-                cold_start=r.get('cold_start', False),
+                developerId=r["developerId"],
+                name=r["name"],
+                score=r["score"],
+                breakdown=ScoreBreakdown(**r["breakdown"]),
+                skillTags=r.get("skillTags", []),
+                cold_start=r.get("cold_start", False),
             )
-            for r in result['recommendations']
+            for r in result["recommendations"]
         ]
 
         logger.info(f"Returned {len(recommendations)} recommendations")
-        
+
         return RecommendResponse(
             recommendations=recommendations,
-            cold_start=result.get('cold_start', False),
+            cold_start=result.get("cold_start", False),
         )
     except Exception as e:
         logger.error(f"Recommend error: {e}", exc_info=True)
@@ -172,7 +176,9 @@ async def recommend(request: RecommendRequest):
 async def feedback(request: FeedbackRequest):
     """Log feedback on recommendation (for retraining)"""
     try:
-        logger.info(f"Feedback: {request.action} for task={request.taskId} dev={request.developerId}")
+        logger.info(
+            f"Feedback: {request.action} for task={request.taskId} dev={request.developerId}"
+        )
 
         result = log_feedback(
             taskId=request.taskId,
@@ -181,9 +187,9 @@ async def feedback(request: FeedbackRequest):
         )
 
         return FeedbackResponse(
-            status=result['status'],
-            retrained=result['retrained'],
-            newAccuracy=result.get('newAccuracy'),
+            status=result["status"],
+            retrained=result["retrained"],
+            newAccuracy=result.get("newAccuracy"),
         )
     except Exception as e:
         logger.error(f"Feedback error: {e}")
@@ -196,9 +202,9 @@ async def accuracy():
     try:
         stats = get_accuracy()
         return AccuracyResponse(
-            precision=stats['precision'],
-            recall=stats['recall'],
-            totalFeedback=stats['totalFeedback'],
+            precision=stats["precision"],
+            recall=stats["recall"],
+            totalFeedback=stats["totalFeedback"],
         )
     except Exception as e:
         logger.error(f"Accuracy error: {e}")
@@ -213,13 +219,6 @@ async def cf_stats():
 
 @app.post("/retrain")
 async def retrain(request: RetrainRequest):
-    """
-    Rebuild the models from the latest feedback and hot-swap them live (no
-    restart). Call on a schedule (end of each sprint) or from an admin button.
-    The backend posts current developers, sprint tasks, and the full
-    accept/reject feedback log. With no body, falls back to a CF-only refresh
-    from feedback the service has already seen.
-    """
     global models_trained
     model_dir = os.getenv("MODEL_DIR", "./models")
 

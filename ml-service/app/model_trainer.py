@@ -1,11 +1,3 @@
-"""
-Model Training and Persistence Module
-
-Trains NLP and Collaborative Filtering models locally.
-Saves/loads trained models for reproducibility.
-Compatible with frontend and backend.
-"""
-
 import numpy as np
 import pandas as pd
 import pickle
@@ -15,6 +7,7 @@ from pathlib import Path
 from typing import Dict, List, Optional, Tuple
 from datetime import datetime
 from sklearn.neighbors import NearestNeighbors
+from sklearn.decomposition import TruncatedSVD
 from sklearn.preprocessing import StandardScaler
 from sentence_transformers import SentenceTransformer
 import joblib
@@ -88,10 +81,6 @@ class ModelPersistence:
 
 
 class EnhancedNLPModel:
-    """
-    Enhanced NLP model for task-developer matching.
-    Uses sentence-transformers with skill embeddings cache.
-    """
     
     def __init__(self, model_name="all-MiniLM-L6-v2"):
         self.model_name = model_name
@@ -203,137 +192,139 @@ class EnhancedNLPModel:
 
 
 class EnhancedCollabFilter:
-    """
-    Enhanced Collaborative Filtering model using k-NN.
-    Trained on historical assignment data.
-    """
     
-    def __init__(self, n_neighbors=5, min_samples=3):
+    def __init__(self, n_neighbors=5, min_samples=3, svd_components=20):
+        # n_neighbors / min_samples kept for signature back-compat (unused here)
         self.n_neighbors = n_neighbors
         self.min_samples = min_samples
-        self.matrix = None
-        self.developers = []
-        self.tasks = []
-        self.knn_model = None
+        self.svd_components = svd_components
+        self.matrix = None            # raw developer x component COUNT matrix
+        self.affinity = None          # SVD-reconstructed affinity matrix
+        self.developers = {}
+        self.tasks = {}
+        self.components = []          # column labels (component names)
+        self.task_components = {}     # task_id -> [component_name, ...]
+        self._dev_index = {}
+        self._comp_index = {}
         self.fitted = False
-        self.scaler = StandardScaler()
-        
-    def train(self, developers: List[Dict], tasks: List[Dict], assignments: List[Dict]):
-        """
-        Train CF model on historical assignments.
-        
-        Parameters:
-            developers: [{ id, name, skills }]
-            tasks: [{ id, description }]
-            assignments: [{ developer_id, task_id, accepted }]
-        """
-        logger.info(f"Training CF model on {len(assignments)} assignments...")
-        
+
+    @staticmethod
+    def _task_comp_list(task):
+        # Accept several field names so this works for TAWOS + real app tasks
+        return (task.get('components')
+                or task.get('componentTags')
+                or task.get('skillTags')
+                or [])
+
+    def train(self, developers, tasks, assignments):
+        logger.info(f"Training component-SVD CF on {len(assignments)} assignments...")
         self.developers = {d['id']: d for d in developers}
         self.tasks = {t['id']: t for t in tasks}
-        
-        # Build interaction matrix (developers x tasks)
+        self.task_components = {t['id']: list(self._task_comp_list(t)) for t in tasks}
+
+        # Component vocabulary (falls back to developer skills if tasks carry none)
+        comp_set = set()
+        for comps in self.task_components.values():
+            comp_set.update(comps)
+        if not comp_set:
+            for d in developers:
+                comp_set.update(d.get('skills') or d.get('skillTags') or [])
+        self.components = sorted(comp_set)
+        self._comp_index = {c: i for i, c in enumerate(self.components)}
+
         dev_ids = list(self.developers.keys())
-        task_ids = list(self.tasks.keys())
-        
-        self.matrix = np.zeros((len(dev_ids), len(task_ids)))
-        dev_idx_map = {did: idx for idx, did in enumerate(dev_ids)}
-        task_idx_map = {tid: idx for idx, tid in enumerate(task_ids)}
-        
-        # Fill matrix with assignment data
-        for assign in assignments:
-            dev_id = assign.get('developer_id')
-            task_id = assign.get('task_id')
-            accepted = assign.get('accepted', False)
-            
-            if dev_id in dev_idx_map and task_id in task_idx_map:
-                dev_idx = dev_idx_map[dev_id]
-                task_idx = task_idx_map[task_id]
-                # 1 for accepted, 0 for rejected, already 0 by default
-                if accepted:
-                    self.matrix[dev_idx][task_idx] = 1.0
-        
-        logger.info(f"   Matrix shape: {self.matrix.shape}, Density: {np.count_nonzero(self.matrix) / self.matrix.size:.2%}")
-        
-        # Train k-NN on normalized matrix
-        normalized_matrix = self.scaler.fit_transform(self.matrix)
-        self.knn_model = NearestNeighbors(n_neighbors=min(self.n_neighbors, len(dev_ids) - 1))
-        self.knn_model.fit(normalized_matrix)
+        self._dev_index = {d: i for i, d in enumerate(dev_ids)}
+
+        # developer x component COUNT matrix from accepted assignments
+        M = np.zeros((len(dev_ids), len(self.components)))
+        for a in assignments:
+            if not a.get('accepted', True):
+                continue
+            did = a.get('developer_id')
+            tid = a.get('task_id')
+            if did not in self._dev_index:
+                continue
+            for c in self.task_components.get(tid, []):
+                ci = self._comp_index.get(c)
+                if ci is not None:
+                    M[self._dev_index[did], ci] += 1.0
+        self.matrix = M
+
+        if M.size == 0 or M.shape[1] == 0 or np.count_nonzero(M) == 0:
+            logger.warning("CF: no component signal available — model left in "
+                           "neutral (cold-start) mode.")
+            self.affinity = None
+            self.fitted = False
+            return False
+
+        # log-scale then low-rank reconstruct (denoise + generalise)
+        M_log = np.log1p(M)
+        k = int(max(2, min(self.svd_components, min(M_log.shape) - 1)))
+        svd = TruncatedSVD(n_components=k, random_state=42)
+        self.affinity = svd.fit_transform(M_log) @ svd.components_
+
+        density = np.count_nonzero(M) / M.size
+        logger.info(f"   Count matrix: {M.shape}, density {density:.2%}, SVD rank {k}")
         self.fitted = True
-        
-        logger.info("CF model trained")
+        logger.info("CF model trained (component-SVD)")
         return True
-    
-    def predict(self, developer_id: str, task_id: str) -> float:
-        """
-        Predict likelihood that developer will accept task (0-1).
-        """
-        if not self.fitted:
-            logger.warning("CF model not trained")
+
+    def predict(self, developer_id, task_id, task_components=None):
+        if not self.fitted or self.affinity is None:
             return 0.5
-        
-        if developer_id not in self.developers or task_id not in self.tasks:
-            logger.debug(f"Unknown dev/task: {developer_id}/{task_id}")
+        if developer_id not in self._dev_index:
             return 0.5
-        
-        dev_ids = list(self.developers.keys())
-        task_ids = list(self.tasks.keys())
-        dev_idx_map = {did: idx for idx, did in enumerate(dev_ids)}
-        task_idx_map = {tid: idx for idx, tid in enumerate(task_ids)}
-        
-        dev_idx = dev_idx_map[developer_id]
-        task_idx = task_idx_map[task_id]
-        
-        # Find similar developers
-        distances, indices = self.knn_model.kneighbors(
-            self.scaler.transform(self.matrix[dev_idx].reshape(1, -1))
-        )
-        
-        # Average similar developers' scores for this task
-        similar_scores = []
-        for idx in indices[0]:
-            if idx != dev_idx:  # Exclude self
-                similar_scores.append(self.matrix[idx][task_idx])
-        
-        if similar_scores:
-            prediction = float(np.mean(similar_scores))
-        else:
-            prediction = 0.5
-        
-        return max(0.0, min(1.0, prediction))
-    
-    def get_state(self) -> Dict:
+
+        comps = task_components if task_components is not None \
+            else self.task_components.get(task_id)
+        if not comps:
+            return 0.5
+        cols = [self._comp_index[c] for c in comps if c in self._comp_index]
+        if not cols:
+            return 0.5
+
+        raw = self.affinity[:, cols].mean(axis=1)
+        lo, hi = float(raw.min()), float(raw.max())
+        if hi <= lo:
+            return 0.5
+        norm = (raw - lo) / (hi - lo)
+        return float(norm[self._dev_index[developer_id]])
+
+    def get_state(self):
         """Get model state for serialization"""
         return {
-            'n_neighbors': self.n_neighbors,
+            'algo': 'component_svd',
+            'svd_components': self.svd_components,
+            'n_neighbors': self.n_neighbors,           # kept for metadata back-compat
             'matrix': self.matrix,
+            'affinity': self.affinity,
             'developers': self.developers,
             'tasks': self.tasks,
+            'components': self.components,
+            'task_components': self.task_components,
             'fitted': self.fitted,
         }
-    
-    def set_state(self, state: Dict):
+
+    def set_state(self, state):
         """Restore model state"""
+        self.svd_components = state.get('svd_components', self.svd_components)
         self.n_neighbors = state.get('n_neighbors', self.n_neighbors)
         self.matrix = state.get('matrix')
+        self.affinity = state.get('affinity')
         self.developers = state.get('developers', {})
         self.tasks = state.get('tasks', {})
-        self.fitted = state.get('fitted', False)
-        
-        if self.fitted and self.matrix is not None:
-            self.scaler.fit(self.matrix)
-            normalized_matrix = self.scaler.transform(self.matrix)
-            self.knn_model = NearestNeighbors(n_neighbors=self.n_neighbors)
-            self.knn_model.fit(normalized_matrix)
-        
-        logger.info("Restored CF model state")
+        self.components = state.get('components', [])
+        self.task_components = state.get('task_components', {})
+        self._dev_index = {d: i for i, d in enumerate(self.developers.keys())}
+        self._comp_index = {c: i for i, c in enumerate(self.components)}
+        self.fitted = bool(state.get('fitted', False)) and self.affinity is not None
+        if self.fitted:
+            logger.info("Restored CF model state (component-SVD)")
+        else:
+            logger.info("Restored CF model state (neutral/cold-start — no affinity)")
 
 
 class RecommenderModelTrainer:
-    """
-    Main trainer that orchestrates NLP and CF model training.
-    Saves trained models for production use.
-    """
     
     def __init__(self, model_dir="./models"):
         self.persistence = ModelPersistence(model_dir)

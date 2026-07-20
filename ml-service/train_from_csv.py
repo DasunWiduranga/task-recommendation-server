@@ -1,36 +1,4 @@
 #!/usr/bin/env python3
-"""
-Train production models directly from the TAWOS CSV exports
-===========================================================
-This is a drop-in alternative to `train.py` that needs **no MySQL and no Kaggle**.
-It reads the same three CSVs your Colab notebook used:
-
-    issues.csv            (ID, Title, Description_Text, Resolution, Story_Point,
-                           Assignee_ID, Project_ID, ...)
-    issue_components.csv  (Issue_ID, component_name)
-
-...shapes them into the exact format your existing
-`app/model_trainer.RecommenderModelTrainer` expects, trains the NLP +
-Collaborative-Filtering models, and writes the .pkl artifacts into ./models/
-so the FastAPI service (`app/main.py`) can load them at startup.
-
-WHERE TO PUT THIS FILE
-----------------------
-Drop it in the ml-service folder, next to train.py:
-    taskrec-api/ml-service/train_from_csv.py
-Put issues.csv + issue_components.csv in ml-service/data/ (or pass --data-dir).
-
-USAGE (from inside ml-service, with the venv activated)
--------------------------------------------------------
-    python train_from_csv.py
-    python train_from_csv.py --data-dir ./data --min-issues 10 --output-dir ./models
-    python train_from_csv.py --projects 4 12 13        # restrict to Mesos/TIMOB/TISTUD
-
-Then start the service so it picks up the trained models:
-    set MODEL_DIR=./models          (Windows)
-    python -m uvicorn app.main:app --reload --port 8000
-"""
-
 import argparse
 import logging
 import sys
@@ -104,7 +72,8 @@ def build_training_data(issues, comps, projects, min_issues):
 
     # 4. Tasks (id + text) — the NLP model caches an embedding per task id.
     tasks = [
-        {"id": f"task_{int(r.ID)}", "title": str(r.Title), "description": str(r.text)}
+        {"id": f"task_{int(r.ID)}", "title": str(r.Title), "description": str(r.text),
+         "components": comp_map.get(r.ID, [])}  # feed the component-SVD CF
         for r in issues.itertuples()
     ]
 
