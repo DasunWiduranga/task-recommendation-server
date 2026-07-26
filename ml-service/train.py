@@ -96,7 +96,7 @@ def main():
         return False
 
     # ------------------------------------------------------------------
-    # Step 1 – Build dataset from real sources
+    # Step 1: Build dataset from real sources
     # ------------------------------------------------------------------
     logger.info("\nSTEP 1: Building Training Dataset from Real Sources")
     logger.info("-" * 70)
@@ -129,7 +129,7 @@ def main():
         avg_skills = sum(len(d.get('skills', [])) for d in developers) / max(len(developers), 1)
         logger.info(f"   Avg skills  : {avg_skills:.1f}")
 
-        # Safety check — need enough data to train
+        # Safety check: need enough data to train
         if len(tasks) == 0:
             logger.error("No tasks loaded from TAWOS. Check your MySQL connection and import.")
             return False
@@ -151,7 +151,7 @@ def main():
         return False
 
     # ------------------------------------------------------------------
-    # Step 2 – Train models
+    # Step 2: Train models
     # ------------------------------------------------------------------
     logger.info("\nSTEP 2: Training Models")
     logger.info("-" * 70)
@@ -181,7 +181,7 @@ def main():
         return False
 
     # ------------------------------------------------------------------
-    # Step 3 – Verify saved models
+    # Step 3: Verify saved models
     # ------------------------------------------------------------------
     logger.info("\nSTEP 3: Verifying Models")
     logger.info("-" * 70)

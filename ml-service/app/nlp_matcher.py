@@ -1,5 +1,5 @@
 """
-nlp_matcher.py  —  top-k max-similarity port (item 2)
+nlp_matcher.py: top-k max-similarity port (item 2)
 =====================================================
 Drop-in replacement for ml-service/app/nlp_matcher.py.
 

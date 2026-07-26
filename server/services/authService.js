@@ -93,7 +93,7 @@ async function forgotPassword(email) {
 
   const user = await User.findOne({ email: email.toLowerCase() });
   if (!user) {
-    // Don't leak account existence — return generic success but no token
+    // Don't leak account existence, so return generic success but no token
     return { token: null };
   }
 
@@ -102,7 +102,7 @@ async function forgotPassword(email) {
   user.resetTokenExpires = new Date(Date.now() + RESET_TOKEN_TTL_MS);
   await user.save();
 
-  // No email infrastructure — return the token so the FE can display it in dev.
+  // No email infrastructure yet, so return the token for the FE to display in dev.
   // In production this would be emailed and the response would not include the token.
   return { token };
 }

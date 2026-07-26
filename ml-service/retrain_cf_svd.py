@@ -78,13 +78,13 @@ def main():
     )
     logger.info(f"Developers: {len(developers)}  Tasks: {len(tasks)}  Assignments: {len(assignments)}")
     if not developers or not tasks:
-        logger.error("No training data produced — check CSV paths/filters.")
+        logger.error("No training data produced, check CSV paths/filters.")
         return False
 
     cf = EnhancedCollabFilter(svd_components=args.svd_components)
     ok = cf.train(developers, tasks, assignments)
     if not ok:
-        logger.error("CF training produced no signal — aborting (nothing saved).")
+        logger.error("CF training produced no signal, aborting (nothing saved).")
         return False
 
     persistence = ModelPersistence(args.output_dir)

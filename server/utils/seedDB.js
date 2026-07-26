@@ -56,7 +56,7 @@ async function seed() {
   console.log('📦 Creating sprint...');
   const sprint = await Sprint.create({
     teamId: team._id,
-    name: 'Sprint 1 — Foundation',
+    name: 'Sprint 1: Foundation',
     startDate: new Date('2024-01-05'),
     endDate: new Date('2024-01-19'),
     status: 'ACTIVE',

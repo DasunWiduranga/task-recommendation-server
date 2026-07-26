@@ -22,7 +22,7 @@ def _weight(name: str, default: float) -> float:
         return float(default)
 
 
-# Fusion weights — single source of truth. Override with env vars after tuning
+# Fusion weights: single source of truth. Override with env vars after tuning
 # (Part A). Defaults reproduce the original 0.4 / 0.4 / 0.2 split.
 W_NLP = _weight("W_NLP", 0.4)
 W_CF = _weight("W_CF", 0.4)

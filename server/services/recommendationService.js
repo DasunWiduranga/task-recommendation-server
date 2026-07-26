@@ -164,7 +164,7 @@ async function getRecommendation(taskId, userId) {
       recommendationId: recommendation._id,
       recommendations: topLocalRecs,
       cold_start: true,
-      warning: 'ML service unavailable — using fallback recommendation',
+      warning: 'ML service unavailable: using fallback recommendation',
     };
   }
 }

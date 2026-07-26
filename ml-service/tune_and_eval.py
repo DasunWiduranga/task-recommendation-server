@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-tune_and_eval.py  —  measure accuracy and tune the fusion weights (item 4)
+tune_and_eval.py: measure accuracy and tune the fusion weights (item 4)
 ==========================================================================
 Runs entirely offline on your TAWOS CSVs (no MySQL, no app). It:
 
@@ -8,7 +8,7 @@ Runs entirely offline on your TAWOS CSVs (no MySQL, no app). It:
      and reports Hit@1 / Hit@3 / Hit@5 / MRR per project for each component
      (keyword TF-IDF, neural MiniLM, CF, and the fused system).
   2. Grid-searches the (nlp, cf, capacity) fusion weights to find the
-     combination that maximises Hit@3 — replacing the arbitrary 0.4/0.4/0.2.
+     combination that maximises Hit@3, replacing the arbitrary 0.4/0.4/0.2.
   3. Prints a per-project table and the recommended weights, so you have
      honest, defensible numbers and a justified weight choice for the write-up.
 

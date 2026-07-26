@@ -127,7 +127,7 @@ async function getAccuracy() {
       f1:            Math.round(f1        * 10000) / 10000,
       totalFeedback,
       source:  'feedback_proxy',
-      warning: 'ML service unavailable — metrics derived from feedback acceptance rate',
+      warning: 'ML service unavailable: metrics derived from feedback acceptance rate',
     };
   }
 }

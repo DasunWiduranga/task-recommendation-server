@@ -140,21 +140,21 @@ class EnhancedNLPModel:
         """Compute similarity between task and developer skills"""
         self.load_pretrained()
         
-        # Get task embedding — use cache if available, compute on the fly for new tasks
+        # Get task embedding. Use cache if available, compute on the fly for new tasks
         if task_id in self.task_embeddings_cache:
             task_embedding = self.task_embeddings_cache[task_id]
         else:
-            # New task not seen during training — encode the task description on the fly.
+            # New task not seen during training, so encode the task description on the fly.
             # This is the common case for tasks created after the last model retrain.
             # The caller injects '_task_description' so we encode meaningful text,
             # not just the MongoDB ObjectId string.
             task_text = developer.get('_task_description') or task_id
-            logger.warning(f"Task {task_id} not in cache — computing embedding on the fly")
+            logger.warning(f"Task {task_id} not in cache, computing embedding on the fly")
             self.load_pretrained()
             task_embedding = self.model.encode([task_text], convert_to_numpy=True)[0]
             self.task_embeddings_cache[task_id] = task_embedding
         
-        # Get developer skill embeddings — accept both field name conventions
+        # Get developer skill embeddings. Accept both field name conventions
         dev_skills = developer.get('skillTags') or developer.get('skills') or []
         if not dev_skills:
             return 0.0
@@ -251,7 +251,7 @@ class EnhancedCollabFilter:
         self.matrix = M
 
         if M.size == 0 or M.shape[1] == 0 or np.count_nonzero(M) == 0:
-            logger.warning("CF: no component signal available — model left in "
+            logger.warning("CF: no component signal available, model left in "
                            "neutral (cold-start) mode.")
             self.affinity = None
             self.fitted = False
@@ -321,7 +321,7 @@ class EnhancedCollabFilter:
         if self.fitted:
             logger.info("Restored CF model state (component-SVD)")
         else:
-            logger.info("Restored CF model state (neutral/cold-start — no affinity)")
+            logger.info("Restored CF model state (neutral/cold-start, no affinity)")
 
 
 class RecommenderModelTrainer:

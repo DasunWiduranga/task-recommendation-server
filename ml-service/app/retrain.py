@@ -1,5 +1,5 @@
 """
-retrain.py  —  live retraining from accumulated feedback (item 3)
+retrain.py: live retraining from accumulated feedback (item 3)
 =================================================================
 New module: ml-service/app/retrain.py
 
@@ -57,7 +57,7 @@ def rebuild_from_payload(
         return {"status": "skipped", "reason": "no developers or tasks supplied",
                 "retrained": False}
     if len(assignments) < 10:
-        logger.warning("Retraining with very few assignments (%d) — CF may stay "
+        logger.warning("Retraining with very few assignments (%d), CF may stay "
                        "in cold-start mode.", len(assignments))
 
     logger.info("Retrain: %d developers, %d tasks, %d assignments",
@@ -86,7 +86,7 @@ def rebuild_from_payload(
 def rebuild_from_accumulated(model_dir: str = "./models") -> Dict:
     """
     CF-only refresh from assignments the service has already seen via /feedback.
-    Does not refresh NLP task caches — prefer rebuild_from_payload when possible.
+    Does not refresh NLP task caches. Prefer rebuild_from_payload when possible.
     """
     assignments = collab_filter.get_trained_assignments()
     if not assignments or len(assignments) < 10:

@@ -33,7 +33,7 @@ def load_csvs(data_dir: Path):
 
 
 def build_training_data(issues, comps, projects, min_issues):
-    # 1. Keep only completed, assigned issues — these are the historical
+    # 1. Keep only completed, assigned issues. These are the historical
     #    "successful assignments" the CF model learns from.
     issues = issues[issues["Resolution"].isin(DONE)].copy()
     issues = issues.dropna(subset=["Assignee_ID"])
@@ -45,7 +45,7 @@ def build_training_data(issues, comps, projects, min_issues):
         issues["Title"].fillna("") + ". " + issues["Description_Text"].fillna("")
     ).str.strip()
 
-    # 2. Active developers only (>= min_issues resolved) — mirrors the notebook's
+    # 2. Active developers only (>= min_issues resolved), mirrors the notebook's
     #    cold-start exclusion so accuracy figures stay comparable.
     counts = issues["Assignee_ID"].value_counts()
     active = set(counts[counts >= min_issues].index)
@@ -70,14 +70,14 @@ def build_training_data(issues, comps, projects, min_issues):
         for dev_id, cnt in dev_skill_counter.items()
     ]
 
-    # 4. Tasks (id + text) — the NLP model caches an embedding per task id.
+    # 4. Tasks (id + text): the NLP model caches an embedding per task id.
     tasks = [
         {"id": f"task_{int(r.ID)}", "title": str(r.Title), "description": str(r.text),
          "components": comp_map.get(r.ID, [])}  # feed the component-SVD CF
         for r in issues.itertuples()
     ]
 
-    # 5. Assignments — every completed issue is a positive (accepted) interaction.
+    # 5. Assignments: every completed issue is a positive (accepted) interaction.
     assignments = [
         {
             "developer_id": f"dev_{int(r.Assignee_ID)}",
@@ -115,7 +115,7 @@ def main():
     logger.info(f"Tasks      : {len(tasks)}")
     logger.info(f"Assignments: {len(assignments)}")
     if not tasks or not developers:
-        logger.error("No training data produced — check your CSV paths/filters.")
+        logger.error("No training data produced, check your CSV paths/filters.")
         return False
 
     trainer = RecommenderModelTrainer(model_dir=args.output_dir)

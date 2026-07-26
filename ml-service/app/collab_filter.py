@@ -165,7 +165,7 @@ class CollabFilter:
                     # Exponential moving average for incremental update
                     self.matrix[di, ti] = 0.7 * current + 0.3 * (1.0 if accepted else 0.0)
             else:
-                # New developer or task seen — trigger re-train on next call
+                # New developer or task seen, so trigger re-train on next call
                 print("New developer/task seen, collab filter updated with new entry")
         except Exception as e:
             print(f"Incremental update error: {e}")
