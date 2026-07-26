@@ -11,7 +11,7 @@ describe('Recommendation Routes', () => {
   let sprintId;
 
   beforeAll(async () => {
-    await mongoose.connect(process.env.MONGO_URI || 'mongodb://localhost:27017/agile_recommender_test');
+    await mongoose.connect(process.env.MONGO_URI_TEST || 'mongodb://localhost:27017/agile_recommender_test');
 
     const user = await User.create({
       name: 'Rec Tester',
@@ -42,7 +42,8 @@ describe('Recommendation Routes', () => {
       title: 'React Frontend Task',
       description: 'Build UI using React and TypeScript with CSS styling',
       storyPoints: 5,
-      createdBy: user._id,
+      teamId: team._id,
+      reporterId: user._id,
     });
     taskId = task._id;
   });

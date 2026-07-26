@@ -24,7 +24,7 @@ describe('Metrics Routes', () => {
   let sprintId;
 
   beforeAll(async () => {
-    await mongoose.connect(process.env.MONGO_URI || 'mongodb://localhost:27017/agile_recommender_test');
+    await mongoose.connect(process.env.MONGO_URI_TEST || 'mongodb://localhost:27017/agile_recommender_test');
 
     const user = await User.create({
       name: 'Metrics Tester',
@@ -66,7 +66,8 @@ describe('Metrics Routes', () => {
         description: 'Test',
         storyPoints: (i + 1) * 3,
         assigneeId: dev._id,
-        createdBy: user._id,
+        teamId: team._id,
+        reporterId: user._id,
       });
     }
   });

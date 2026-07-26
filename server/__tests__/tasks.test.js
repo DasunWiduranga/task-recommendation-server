@@ -8,9 +8,10 @@ const app = require('../server');
 let authToken;
 let userId;
 let sprintId;
+let teamId;
 
 beforeAll(async () => {
-  await mongoose.connect(process.env.MONGO_URI || 'mongodb://localhost:27017/agile_recommender_test');
+  await mongoose.connect(process.env.MONGO_URI_TEST || 'mongodb://localhost:27017/agile_recommender_test');
 
   // Create test user
   const user = await User.create({
@@ -32,6 +33,7 @@ beforeAll(async () => {
     adminId: userId,
     memberIds: [userId],
   });
+  teamId = team._id;
 
   const sprint = await Sprint.create({
     teamId: team._id,
@@ -88,7 +90,8 @@ describe('Task Routes', () => {
         sprintId: sprintId,
         title: 'Get Test',
         description: 'Test',
-        createdBy: userId,
+        teamId: teamId,
+        reporterId: userId,
       });
 
       const res = await request(app)
@@ -106,7 +109,8 @@ describe('Task Routes', () => {
         sprintId: sprintId,
         title: 'Original',
         description: 'Original desc',
-        createdBy: userId,
+        teamId: teamId,
+        reporterId: userId,
       });
 
       const res = await request(app)
@@ -126,7 +130,8 @@ describe('Task Routes', () => {
         sprintId: sprintId,
         title: 'To Delete',
         description: 'Test',
-        createdBy: userId,
+        teamId: teamId,
+        reporterId: userId,
       });
 
       const res = await request(app)

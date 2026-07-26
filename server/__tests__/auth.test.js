@@ -5,7 +5,7 @@ const app = require('../server');
 
 // Mock DB
 beforeAll(async () => {
-  await mongoose.connect(process.env.MONGO_URI || 'mongodb://localhost:27017/agile_recommender_test');
+  await mongoose.connect(process.env.MONGO_URI_TEST || 'mongodb://localhost:27017/agile_recommender_test');
 });
 
 afterAll(async () => {
