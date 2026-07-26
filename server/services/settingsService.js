@@ -12,7 +12,9 @@ async function getUserProfile(userId, teamIds) {
   return {
     user,
     stats: {
-      totalTasks:       await Task.countDocuments({ createdBy: userId }),
+      // Tasks the user is involved in, either as reporter or assignee.
+      // (There is no createdBy field on Task; the creator is reporterId.)
+      totalTasks:       await Task.countDocuments({ $or: [{ reporterId: userId }, { assigneeId: userId }] }),
       totalSprints:     await Sprint.countDocuments({ teamId: { $in: teamIds } }),
       totalAssignments: await Assignment.countDocuments({ developerId: userId }),
       feedbackGiven:    await Feedback.countDocuments({ developerId: userId }),
@@ -57,7 +59,9 @@ async function changePassword(userId, currentPassword, newPassword) {
 async function exportUserData(userId) {
   const user = await User.findById(userId).select('-passwordHash');
   const [tasks, assignments, feedback, teams] = await Promise.all([
-    Task.find({ createdBy: userId }),
+    // A personal export should cover tasks the user raised and tasks assigned
+    // to them; a developer who never files tickets would otherwise export none.
+    Task.find({ $or: [{ reporterId: userId }, { assigneeId: userId }] }),
     Assignment.find({ developerId: userId }),
     Feedback.find({ developerId: userId }),
     Team.find({ memberIds: userId }),
@@ -72,12 +76,17 @@ async function exportUserData(userId) {
       skillTags: user.skillTags,
       createdAt: user.createdAt,
     },
+    // The Settings UI advertises preferences as part of the export.
+    preferences: user.preferences || { ...PREFERENCES_DEFAULTS },
     tasks: tasks.map(t => ({
       title:       t.title,
       description: t.description,
       storyPoints: t.storyPoints,
       priority:    t.priority,
       status:      t.status,
+      // Distinguishes tasks the user raised from ones assigned to them,
+      // now that the export covers both.
+      relationship: String(t.reporterId) === String(userId) ? 'reporter' : 'assignee',
       createdAt:   t.createdAt,
     })),
     assignments: assignments.map(a => ({ taskId: a.taskId, accepted: a.accepted, createdAt: a.createdAt })),
@@ -131,7 +140,7 @@ async function updatePreferences(userId, body) {
 
 async function getUserStats(userId) {
   const [tasksCreated, tasksAssigned, assignments, feedbackGiven] = await Promise.all([
-    Task.countDocuments({ createdBy: userId }),
+    Task.countDocuments({ reporterId: userId }),
     Task.countDocuments({ assigneeId: userId }),
     Assignment.find({ developerId: userId }),
     Feedback.countDocuments({ developerId: userId }),

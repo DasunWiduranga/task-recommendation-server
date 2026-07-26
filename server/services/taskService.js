@@ -105,6 +105,9 @@ async function updateTask(taskId, updates, userId) {
     if (updates[field] !== undefined) sanitized[field] = updates[field];
   });
 
+  // Priority is stored uppercase, same normalisation createTask applies.
+  if (sanitized.priority) sanitized.priority = String(sanitized.priority).toUpperCase();
+
   const existing = await Task.findById(taskId).select('sprintId');
   if (!existing) {
     const err = new Error('Task not found');
