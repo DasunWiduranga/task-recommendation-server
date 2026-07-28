@@ -4,6 +4,33 @@ const Assignment = require('../models/Assignment');
 const { getAccessibleTeamIds } = require('../utils/access');
 const { TASK } = require('../constants');
 
+// Keeps the CF training ground-truth (Assignment records) in sync when a task
+// changes hands. A reassignment is real-world evidence the previous match did
+// not stick, so the old developer's accepted record is flipped to rejected and
+// the new developer gets (or keeps) exactly one accepted record. The Feedback
+// collection is deliberately left alone: it is an immutable audit of how the
+// user responded to a recommendation at the time.
+async function recordAssignmentChange(taskId, sprintId, prevAssigneeId, nextAssigneeId) {
+  const prev = prevAssigneeId ? prevAssigneeId.toString() : null;
+  const next = nextAssigneeId ? nextAssigneeId.toString() : null;
+  if (prev === next) return;
+
+  if (prev) {
+    await Assignment.updateMany(
+      { taskId, developerId: prev, accepted: true },
+      { accepted: false }
+    );
+  }
+
+  if (next) {
+    await Assignment.findOneAndUpdate(
+      { taskId, developerId: next },
+      { accepted: true, sprintId },
+      { upsert: true, new: true, sort: { createdAt: -1 } }
+    );
+  }
+}
+
 async function assertSprintMutable(sprintId) {
   const sprint = await Sprint.findById(sprintId).select('status teamId');
   if (sprint && sprint.status === 'COMPLETED') {
@@ -108,7 +135,7 @@ async function updateTask(taskId, updates, userId) {
   // Priority is stored uppercase, same normalisation createTask applies.
   if (sanitized.priority) sanitized.priority = String(sanitized.priority).toUpperCase();
 
-  const existing = await Task.findById(taskId).select('sprintId');
+  const existing = await Task.findById(taskId).select('sprintId assigneeId');
   if (!existing) {
     const err = new Error('Task not found');
     err.statusCode = 404;
@@ -150,9 +177,17 @@ async function updateTask(taskId, updates, userId) {
     sanitized.teamId   = targetSprint.teamId;
   }
 
-  return Task.findByIdAndUpdate(taskId, sanitized, { new: true })
+  const updated = await Task.findByIdAndUpdate(taskId, sanitized, { new: true })
     .populate('assigneeId', '-passwordHash')
     .populate('reporterId', '-passwordHash');
+
+  if ('assigneeId' in sanitized) {
+    await recordAssignmentChange(
+      updated._id, updated.sprintId, existing.assigneeId, sanitized.assigneeId
+    );
+  }
+
+  return updated;
 }
 
 async function deleteTask(taskId, userId) {
@@ -201,17 +236,11 @@ async function assignTask(taskId, assigneeId, userId) {
     throw err;
   }
 
+  const prevAssigneeId = task.assigneeId;
   task.assigneeId = assigneeId || null;
   await task.save();
 
-  if (assigneeId) {
-    await new Assignment({
-      taskId:      task._id,
-      developerId: assigneeId,
-      accepted:    true,
-      sprintId:    task.sprintId,
-    }).save();
-  }
+  await recordAssignmentChange(task._id, task.sprintId, prevAssigneeId, assigneeId);
 
   return Task.findById(task._id)
     .populate('assigneeId', '-passwordHash')

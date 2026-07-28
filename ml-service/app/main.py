@@ -141,6 +141,7 @@ async def recommend(request: RecommendRequest):
                 "id": request.task.id,
                 "description": request.task.description,
                 "title": getattr(request.task, "title", request.task.id),
+                "componentTags": request.task.componentTags,
             },
             developers=[d.model_dump() for d in request.developers],
             assignments=[a.model_dump() for a in request.assignments],
@@ -227,7 +228,8 @@ async def retrain(request: RetrainRequest):
         for d in request.developers
     ]
     tasks = [
-        {"id": t.id, "description": (t.description or t.title), "title": t.title}
+        {"id": t.id, "description": (t.description or t.title), "title": t.title,
+         "componentTags": t.componentTags}
         for t in request.tasks
     ]
     assignments = [a.model_dump() for a in request.assignments]

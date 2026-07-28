@@ -96,8 +96,13 @@ def get_recommendations(
     task_description = task.get('description', task.get('title', ''))
     task_id = str(task.get('id', ''))
     
-    # Check cold-start mode
-    cold_start = len(assignments) < 10
+    # Cold-start only if the CF model has no learned affinity AND we have too
+    # little in-request history to say anything useful.
+    cf_fitted = bool(
+        _models_loaded and _trainer is not None
+        and getattr(_trainer.cf_model, "fitted", False)
+    )
+    cold_start = (not cf_fitted) and len(assignments) < 10
     
     recommendations = []
     
@@ -125,8 +130,13 @@ def get_recommendations(
                     task_id, dev_with_task
                 )
                 
-                # CF score from trained model
-                cf_score = _trainer.cf_model.predict(dev_id, task_id)
+                # CF score from trained model. Pass the task's component tags
+                # so tasks created after the last retrain still get a real CF
+                # score instead of the 0.5 unknown-task fallback.
+                task_components = task.get('componentTags') or None
+                cf_score = _trainer.cf_model.predict(
+                    dev_id, task_id, task_components=task_components
+                )
                 
                 # Capacity penalty
                 current_load = workloads.get(dev_id, 0)

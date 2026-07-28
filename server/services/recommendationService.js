@@ -94,7 +94,7 @@ async function getRecommendation(taskId, userId) {
       .map(t => ({ taskId: t._id.toString(), developerId: t.assigneeId.toString(), accepted: true }));
 
     const mlRequest = {
-      task:        { id: task._id.toString(), description: `${task.title} ${task.description}`.trim() },
+      task:        { id: task._id.toString(), description: `${task.title} ${task.description}`.trim(), componentTags: task.componentLabels || [] },
       developers:  developers.map(d => ({ id: d._id.toString(), name: d.name, skillTags: d.skillTags || [] })),
       assignments: assignmentsPayload,
       workloads:   workloadsPayload,

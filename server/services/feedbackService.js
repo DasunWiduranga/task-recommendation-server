@@ -54,8 +54,18 @@ async function logFeedback({ taskId, developerId, action, assignmentId }) {
       throw err;
     }
   } else if (taskId && developerId) {
-    assignment = new Assignment({ taskId, developerId, accepted: action === 'accept' });
-    await assignment.save();
+    // The assign endpoint usually creates the Assignment just before this call.
+    // Update that record rather than inserting a duplicate, which would
+    // double-count the acceptance in CF training.
+    assignment = await Assignment.findOneAndUpdate(
+      { taskId, developerId },
+      { accepted: action === 'accept' },
+      { new: true, sort: { createdAt: -1 } }
+    );
+    if (!assignment) {
+      assignment = new Assignment({ taskId, developerId, accepted: action === 'accept' });
+      await assignment.save();
+    }
   } else {
     const err = new Error('Provide assignmentId or both taskId and developerId.');
     err.statusCode = 400;

@@ -5,6 +5,7 @@ from typing import List, Optional, Dict
 class TaskInput(BaseModel):
     id: str
     description: str
+    componentTags: List[str] = Field(default_factory=list)
 
 
 class DeveloperInput(BaseModel):
@@ -82,6 +83,7 @@ class RetrainTask(BaseModel):
     id: str
     description: Optional[str] = ""
     title: Optional[str] = ""
+    componentTags: List[str] = Field(default_factory=list)
 
 
 class RetrainAssignment(BaseModel):
