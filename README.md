@@ -8,7 +8,14 @@ Backend for the agile task recommendation system: Express API (`server/`, port 5
 - Python 3.10+
 - MongoDB connection string (Atlas or local)
 
-## 1. Start the ML service
+## 1. Clone the project
+
+```bash
+git clone https://github.com/DasunWiduranga/task-recommendation-server.git
+cd task-recommendation-server
+```
+
+## 2. Start the ML service
 
 ```bash
 cd ml-service
@@ -20,7 +27,7 @@ uvicorn app.main:app --reload --port 8000
 
 Check: http://localhost:8000/health
 
-## 2. Start the Express API
+## 3. Start the Express API
 
 ```bash
 cd server
