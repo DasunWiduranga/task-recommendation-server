@@ -45,3 +45,10 @@ Thumbs.db
 *.swo
 .idea/
 .vscode/settings.json
+
+# --- Offline evaluation scratch (simulated feedback state) ---
+ml-service/models_sim/
+
+# --- Regenerable evaluation intermediates ---
+ml-service/eval_feedback_curve.json
+ml-service/dissertation_results.json

@@ -1,0 +1,6 @@
+{
+  "_note": "REPLACE these with the 7 real SUS scores from your usability questionnaires. These placeholders only mirror the dissertation's reported range (72-88, mean 80.0) and are NOT real data until you overwrite them.",
+  "scores": [72, 75, 77.5, 80, 82.5, 85, 88],
+  "target": 70,
+  "industry_average": 68
+}
