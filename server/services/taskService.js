@@ -126,11 +126,22 @@ async function getTasks({ sprintId } = {}, userId) {
 }
 
 async function updateTask(taskId, updates, userId) {
-  const allowedUpdates = ['title', 'description', 'status', 'priority', 'storyPoints', 'assigneeId'];
+  const allowedUpdates = ['title', 'description', 'status', 'priority', 'storyPoints', 'assigneeId', 'componentLabels'];
   const sanitized = {};
   allowedUpdates.forEach(field => {
     if (updates[field] !== undefined) sanitized[field] = updates[field];
   });
+
+  if (sanitized.componentLabels !== undefined) {
+    if (!Array.isArray(sanitized.componentLabels)) {
+      const err = new Error('componentLabels must be an array of strings');
+      err.statusCode = 400;
+      throw err;
+    }
+    sanitized.componentLabels = sanitized.componentLabels
+      .filter(l => typeof l === 'string' && l.trim())
+      .map(l => l.trim());
+  }
 
   // Priority is stored uppercase, same normalisation createTask applies.
   if (sanitized.priority) sanitized.priority = String(sanitized.priority).toUpperCase();
